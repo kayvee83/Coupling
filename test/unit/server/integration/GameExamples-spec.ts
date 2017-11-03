@@ -186,6 +186,58 @@ describe('The game', function () {
         });
     });
 
+    it('will prioritize needy pairs over never paired as long a never-pair gets consumed for that individual', function (done) {
+        const tribeId = 'WhateverYouWant';
+
+        const rob = {_id: monk.id(), name: "Rob", tribe: tribeId, badge: Badge.Default};
+        const brett = {_id: monk.id(), name: "Brett", tribe: tribeId, badge: Badge.Default};
+        const jen = {_id: monk.id(), name: "Jen", tribe: tribeId, badge: Badge.Default};
+        const andrew = {_id: monk.id(), name: "Andrew", tribe: tribeId, badge: Badge.Default};
+        const david = {_id: monk.id(), name: "David", tribe: tribeId, badge: Badge.Default};
+        const grace = {_id: monk.id(), name: "Grace", tribe: tribeId, badge: Badge.Default};
+
+        const playerRoster = [
+            rob,
+            brett,
+            jen,
+            andrew,
+            david,
+            grace
+        ];
+
+        const history = [
+            new PairAssignmentDocument(new Date(2017, 1, 5), [
+                [rob, david], [brett, andrew], [jen]
+            ], tribeId),
+            new PairAssignmentDocument(new Date(2017, 1, 4), [
+                [rob, jen], [brett]
+            ], tribeId),
+            new PairAssignmentDocument(new Date(2017, 1, 3), [
+                [rob, brett], [jen, andrew]
+            ], tribeId),
+            new PairAssignmentDocument(new Date(2017, 1, 2), [
+                [rob, andrew], [jen, brett]
+            ], tribeId),
+            new PairAssignmentDocument(new Date(2017, 1, 1), [
+                [rob, jen], [brett, andrew]
+            ], tribeId)
+        ];
+
+        const couplingGameFactory = new CouplingGameFactory();
+        const gameRunner = new GameRunner(couplingGameFactory);
+
+        const tribe = {id: tribeId, pairingRule: PairingRule.LongestTime};
+
+        const expectedPairings = new PairAssignmentDocument(new Date(2017, 1, 6), [[rob, andrew], [brett, david], [jen, grace]], tribeId).pairs;
+
+        saveAndLoadData(playerRoster, history, tribeId)
+            .then(function (both) {
+                const pairAssignments = gameRunner.run(both.players, [], both.history, tribe);
+                expect(pairAssignments.pairs).toBe(expectedPairings);
+            })
+            .then(done, done.fail);
+    });
+
     it('will not get stuck when pairing people with different badges', function (done) {
         const tribeId = 'Avengers';
 
@@ -231,7 +283,7 @@ describe('The game', function () {
 
     function saveAndLoadData(playerRoster, history, tribeId) {
         return playersCollection.drop()
-            .then(function() {
+            .then(function () {
                 return historyCollection.drop();
             })
             .then(function () {
